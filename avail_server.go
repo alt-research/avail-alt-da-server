@@ -148,6 +148,7 @@ func (d *AvailDAServer) HandlePut(w http.ResponseWriter, r *http.Request) {
 	}
 
 	input, err := io.ReadAll(r.Body)
+
 	if err != nil {
 		d.log.Error("Failed to read request body", "err", err)
 		w.WriteHeader(http.StatusBadRequest)
