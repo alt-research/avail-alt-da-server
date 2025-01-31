@@ -2,115 +2,55 @@ package scripts
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
-	"time"
 
 	types "avail-alt-da-server/types"
-	"avail-alt-da-server/utils"
 
-	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
-	gsrpc_types "github.com/centrifuge/go-substrate-rpc-client/v4/types"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/availproject/avail-go-sdk/metadata"
+	daPallet "github.com/availproject/avail-go-sdk/metadata/pallets/data_availability"
+	SDK "github.com/availproject/avail-go-sdk/sdk"
+	"github.com/ethereum/go-ethereum/log"
 )
 
-func SubmitDataAndWatch(specs *types.AvailDASpecs, ctx context.Context, data []byte) (types.AvailBlockRef, error) {
-	call, err := createDataAvailabilityCall(specs, data)
+func SubmitDataAndWatch(specs *types.AvailDASpecs, ctx context.Context, data []byte, log log.Logger) (types.AvailBlockRef, error) {
+	sdk, err := SDK.NewSDK(specs.ApiURL)
+	if err != nil {
+		panic(err)
+	}
+
+	accountId, err := metadata.NewAccountIdFromAddress(specs.KeyringPair.SS58Address(42))
 
 	if err != nil {
-
-		return types.AvailBlockRef{}, fmt.Errorf("creating data availability call: %w", err)
+		log.Error("unable to create account id from address", "error", err)
+		return types.AvailBlockRef{}, fmt.Errorf("unable to create account id from address: %v, error: %w", specs.KeyringPair.SS58Address(42), err)
 	}
 
-	signedExt, sender, nonce, err := prepareAndSignExtrinsic(specs, call)
+	nonce, err := SDK.Account.Nonce(sdk.Client, accountId)
 	if err != nil {
-		fmt.Println(err)
-		return types.AvailBlockRef{}, fmt.Errorf("preparing and signing extrinsic: %w", err)
+		log.Error("unable to get nonce for account id", "error", err)
+		return types.AvailBlockRef{}, fmt.Errorf("unable to get nonce for account id: %v, error: %w", accountId, err)
 	}
 
-	dataCommitment := crypto.Keccak256(data)
-
-	return waitForExtrinsicFinalization(specs, signedExt, sender, nonce, dataCommitment)
-
-}
-
-func prepareAndSignExtrinsic(specs *types.AvailDASpecs, call gsrpc_types.Call) (gsrpc_types.Extrinsic, string, uint32, error) {
-
-	accountInfo, err := fetchAccountInfo(specs)
+	tx := sdk.Tx.DataAvailability.SubmitData(data)
+	res, err := tx.ExecuteAndWatchInclusion(specs.KeyringPair, SDK.NewTransactionOptions().WithAppId(uint32(specs.AppID)))
 	if err != nil {
-		return gsrpc_types.Extrinsic{}, specs.KeyringPair.Address, 0, err
+		log.Error("unable to execute and watch inclusion", "error", err)
+		return types.AvailBlockRef{}, fmt.Errorf("unable to execute and watch inclusion: %w", err)
 	}
 
-	nonce := utils.GetAccountNonce(uint32(accountInfo.Nonce))
-	ext := gsrpc_types.NewExtrinsic(call)
-
-	err = signExtrinsic(&ext, specs.KeyringPair, specs.GenesisHash, specs.Rv, nonce, specs.AppID)
-	if err != nil {
-		return gsrpc_types.Extrinsic{}, specs.KeyringPair.Address, nonce, err
+	if isSuc, err := res.IsSuccessful(); err != nil {
+		log.Error("cannot check if data was submitted", "error", err)
+		return types.AvailBlockRef{}, fmt.Errorf("cannot check if data was submitted: %w", err)
+	} else if !isSuc {
+		log.Error("data was not found in the block")
+		return types.AvailBlockRef{}, fmt.Errorf("data was not found in the block")
 	}
 
-	return ext, specs.KeyringPair.Address, nonce, nil
-}
+	log.Info("Block Hash: %v, Block Index: %v, Tx Hash: %v, Tx Index: %v", res.BlockHash.ToHexWith0x(), res.BlockNumber, res.TxHash.ToHexWith0x(), res.TxIndex)
+	events := res.Events.Unwrap()
+	event := SDK.EventFindFirst(events, daPallet.EventDataSubmitted{}).Unwrap()
 
-func waitForExtrinsicFinalization(specs *types.AvailDASpecs, ext gsrpc_types.Extrinsic, sender string, nonce uint32, dataCommitment []byte) (types.AvailBlockRef, error) {
-	sub, err := specs.Api.RPC.Author.SubmitAndWatchExtrinsic(ext)
-	if err != nil {
-		return types.AvailBlockRef{}, fmt.Errorf("cannot submit extrinsic: %w", err)
-	}
-	defer sub.Unsubscribe()
+	return types.AvailBlockRef{BlockHash: res.BlockHash.ToHexWith0x(), Sender: specs.KeyringPair.SS58Address(42), Nonce: int64(nonce), Commitment: event.DataHash.ToHexWith0x()}, nil
 
-	timeout := time.After(specs.Timeout)
-	for {
-		select {
-		case status := <-sub.Chan():
-			if status.IsInBlock {
-				fmt.Printf("Txn inside block %v\n", status.AsInBlock.Hex())
-			} else if status.IsFinalized {
-				return types.AvailBlockRef{BlockHash: string(status.AsFinalized.Hex()), Sender: sender, Nonce: int64(nonce), Commitment: dataCommitment}, nil
-			}
-		case <-timeout:
-			return types.AvailBlockRef{}, errors.New("timeout before getting finalized status")
-		}
-	}
-}
-
-func fetchAccountInfo(specs *types.AvailDASpecs) (gsrpc_types.AccountInfo, error) {
-	var accountInfo gsrpc_types.AccountInfo
-
-	ok, err := specs.Api.RPC.State.GetStorageLatest(specs.StorageKey, &accountInfo)
-
-	if err != nil || !ok {
-		return accountInfo, fmt.Errorf("cannot get latest storage: %w", err)
-	}
-
-	return accountInfo, nil
-}
-
-func signExtrinsic(ext *gsrpc_types.Extrinsic, keyringPair signature.KeyringPair, genesisHash gsrpc_types.Hash, rv *gsrpc_types.RuntimeVersion, nonce uint32, appID int) error {
-	options := gsrpc_types.SignatureOptions{
-		BlockHash:          genesisHash,
-		Era:                gsrpc_types.ExtrinsicEra{IsMortalEra: false},
-		GenesisHash:        genesisHash,
-		Nonce:              gsrpc_types.NewUCompactFromUInt(uint64(nonce)),
-		SpecVersion:        rv.SpecVersion,
-		Tip:                gsrpc_types.NewUCompactFromUInt(0),
-		AppID:              gsrpc_types.NewUCompactFromUInt(uint64(appID)),
-		TransactionVersion: rv.TransactionVersion,
-	}
-
-	err := ext.Sign(keyringPair, options)
-	if err != nil {
-		return fmt.Errorf("cannot sign extrinsic: %w", err)
-	}
-
-	return nil
-}
-
-func createDataAvailabilityCall(specs *types.AvailDASpecs, data []byte) (gsrpc_types.Call, error) {
-
-	c, err := gsrpc_types.NewCall(specs.Meta, "DataAvailability.submit_data", gsrpc_types.NewBytes(data))
-	if err != nil {
-		return gsrpc_types.Call{}, fmt.Errorf("cannot create new call: %w", err)
-	}
-	return c, nil
 }

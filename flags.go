@@ -90,7 +90,6 @@ type CLIConfig struct {
 }
 
 func ReadCLIConfig(ctx *cli.Context) CLIConfig {
-	fmt.Println(ctx.String(AvailRPCUrl), ctx.String(Seed), ctx.Int(AppID), ctx.Duration(Timeout))
 	return CLIConfig{
 		RPC:     ctx.String(AvailRPCUrl),
 		Seed:    ctx.String(Seed),
@@ -115,7 +114,6 @@ func (c CLIConfig) Check() error {
 func CheckRequired(ctx *cli.Context) error {
 
 	for _, f := range requiredFlags {
-		fmt.Println(ctx.Value(f.Names()[0]))
 		if !ctx.IsSet(f.Names()[0]) {
 			return fmt.Errorf("flag %s is required", f.Names()[0])
 		}
