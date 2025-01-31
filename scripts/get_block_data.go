@@ -5,10 +5,10 @@ import (
 
 	"avail-alt-da-server/types"
 
-	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v4"
-	gsrpc_types "github.com/centrifuge/go-substrate-rpc-client/v4/types"
-	"github.com/centrifuge/go-substrate-rpc-client/v4/types/codec"
-	"github.com/vedhavyas/go-subkey"
+	"github.com/availproject/avail-go-sdk/metadata"
+	"github.com/availproject/avail-go-sdk/primitives"
+
+	SDK "github.com/availproject/avail-go-sdk/sdk"
 )
 
 func GetBlockExtrinsicData(specs types.AvailDASpecs, avail_blk_ref types.AvailBlockRef) ([]byte, error) {
@@ -17,7 +17,7 @@ func GetBlockExtrinsicData(specs types.AvailDASpecs, avail_blk_ref types.AvailBl
 	Address := avail_blk_ref.Sender
 	Nonce := avail_blk_ref.Nonce
 
-	avail_blk, err := fetchBlock(specs.Api, Hash)
+	avail_blk, err := fetchBlock(specs.ApiURL, Hash)
 	if err != nil {
 		panic(fmt.Errorf("cannot fetch block: %w", err))
 	}
@@ -25,42 +25,52 @@ func GetBlockExtrinsicData(specs types.AvailDASpecs, avail_blk_ref types.AvailBl
 	return extractExtrinsic(Address, Hash, Nonce, avail_blk)
 }
 
-func fetchBlock(api *gsrpc.SubstrateAPI, Hash string) (*gsrpc_types.SignedBlock, error) {
+func fetchBlock(apiURL string, Hash string) (SDK.Block, error) {
 
-	blk_hash, err := gsrpc_types.NewHashFromHexString(Hash)
-
+	sdk, err := SDK.NewSDK(apiURL)
 	if err != nil {
-		return &gsrpc_types.SignedBlock{}, fmt.Errorf("unable to convert string hash into types.hash, error:%w", err)
+		return SDK.Block{}, fmt.Errorf("cannot create sdk: %w", err)
 	}
 
-	avail_blk, err := api.RPC.Chain.GetBlock(blk_hash)
+	blockHash, err := primitives.NewBlockHashFromHexString(Hash)
 	if err != nil {
-		return &gsrpc_types.SignedBlock{}, fmt.Errorf("cannot get block for hash:%v and getting error:%w", Hash, err)
+		return SDK.Block{}, fmt.Errorf("unable to convert string hash into types.hash, error:%w", err)
+	}
+	block, err := SDK.NewBlock(sdk.Client, blockHash)
+	if err != nil {
+		return SDK.Block{}, fmt.Errorf("unable to create block, error:%w", err)
 	}
 
-	return avail_blk, nil
+	return block, nil
 }
 
-func extractExtrinsic(Address string, Hash string, Nonce int64, avail_blk *gsrpc_types.SignedBlock) ([]byte, error) {
+func extractExtrinsic(Address string, Hash string, Nonce int64, avail_blk SDK.Block) ([]byte, error) {
+	accountId, err := metadata.NewAccountIdFromAddress(Address)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create account id from address: %v, error: %w", Address, err)
+	}
 
-	for _, ext := range avail_blk.Block.Extrinsics {
+	for _, blob := range avail_blk.Block.Extrinsics {
 
-		ext_Addr, err := subkey.SS58Address(ext.Signature.Signer.AsID.ToBytes(), 42)
-		if err != nil {
-			fmt.Println("unable to get sender address from extrinsic", "err", err)
-		}
+		ext_Nonce := blob.Signed.Unwrap().Nonce
 
-		if ext_Addr == Address && ext.Signature.Nonce.Int64() == Nonce {
-			args := ext.Method.Args
-			var data []byte
-			err = codec.Decode(args, &data)
-			if err != nil {
-				return []byte{}, fmt.Errorf("unable to decode the extrinsic data by address: %v with nonce: %v", Address, Nonce)
+		if sameSignature(&blob, accountId) && ext_Nonce == uint32(Nonce) {
+			extrinsic, ok := SDK.NewDataSubmission(&blob)
+			if !ok {
+				return []byte{}, fmt.Errorf("unable to create data submission from extrinsic")
 			}
-
-			return data, nil
+			return extrinsic.Data, nil
 		}
 	}
 
 	return []byte{}, fmt.Errorf("didn't find any extrinsic data for address:%v in block having hash:%v", Address, Hash)
+}
+
+func sameSignature(tx *primitives.DecodedExtrinsic, accountId metadata.AccountId) bool {
+	txAccountId := tx.Signed.Unwrap().Address.Id.Unwrap()
+	if accountId.Value != txAccountId {
+		return false
+	}
+
+	return true
 }

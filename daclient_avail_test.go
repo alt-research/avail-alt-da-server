@@ -41,12 +41,16 @@ func Check() error {
 }
 
 func TestAvailDAClientService(t *testing.T) {
+
 	logger := testlog.Logger(t, log.LevelDebug)
 	if err := godotenv.Load(); err != nil {
 		logger.Crit("Error loading .env file: ", err)
 	}
 	RPC = os.Getenv("AVAIL_RPC")
 	SEED = os.Getenv("AVAIL_SEED")
+
+	logger.Info("RPC: ", RPC)
+	logger.Info("SEED: ", SEED)
 
 	appID, err := strconv.ParseInt(os.Getenv("AVAIL_APPID"), 10, 64)
 	if err != nil {

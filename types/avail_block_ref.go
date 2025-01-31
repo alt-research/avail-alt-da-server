@@ -7,17 +7,16 @@ import (
 
 	"avail-alt-da-server/utils"
 
-	gsrpc "github.com/centrifuge/go-substrate-rpc-client/v4"
-	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
-	gsrpc_types "github.com/centrifuge/go-substrate-rpc-client/v4/types"
+	SDK "github.com/availproject/avail-go-sdk/sdk"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/vedhavyas/go-subkey/v2"
 )
 
 type AvailBlockRef struct {
 	BlockHash  string // Hash for block on avail chain
 	Sender     string // sender address to filter extrinsic out sepecifically for this address
 	Nonce      int64  // nonce to filter specific extrinsic
-	Commitment []byte
+	Commitment string
 }
 
 func (a *AvailBlockRef) MarshalToBinary() ([]byte, error) {
@@ -38,56 +37,26 @@ func (a *AvailBlockRef) UnmarshalFromBinary(avail_blk_Ref []byte) error {
 }
 
 type AvailDASpecs struct {
+	ApiURL      string
 	Timeout     time.Duration
 	AppID       int
-	Api         *gsrpc.SubstrateAPI
-	Meta        *gsrpc_types.Metadata
-	GenesisHash gsrpc_types.Hash
-	Rv          *gsrpc_types.RuntimeVersion
-	KeyringPair signature.KeyringPair
-	StorageKey  gsrpc_types.StorageKey
+	KeyringPair subkey.KeyPair
 }
 
 func NewAvailDASpecs(ApiURL string, AppID int, Seed string, Timeout time.Duration) (*AvailDASpecs, error) {
 
 	AppID = utils.EnsureValidAppID(AppID)
-	api, err := utils.GetSubstrateApi(ApiURL)
-	if err != nil {
-		log.Error("⚠️ cannot connect to the rpc: error:%w", err)
-		return nil, err
-	}
 
-	meta, err := api.RPC.State.GetMetadataLatest()
-	if err != nil {
-		log.Warn("⚠️ cannot get metadata: error:%w", err)
-		return nil, err
-	}
-
-	genesisHash, rv, err := utils.FetchChainData(api)
-	if err != nil {
-		return nil, err
-	}
-
-	keyringPair, err := signature.KeyringPairFromSecret(Seed, 42)
+	keyringPair, err := SDK.Account.NewKeyPair(Seed)
 	if err != nil {
 		log.Warn("⚠️ cannot create LeyPair: error:%w", err)
 		return nil, err
 	}
 
-	storageKey, err := gsrpc_types.CreateStorageKey(meta, "System", "Account", keyringPair.PublicKey)
-	if err != nil {
-		log.Warn("⚠️ cannot create storage key: error:%w", err)
-		return nil, err
-	}
-
 	return &AvailDASpecs{
+		ApiURL:      ApiURL,
 		Timeout:     Timeout,
 		AppID:       AppID,
-		Api:         api,
-		Meta:        meta,
-		GenesisHash: genesisHash,
-		Rv:          rv,
 		KeyringPair: keyringPair,
-		StorageKey:  storageKey,
 	}, nil
 }
