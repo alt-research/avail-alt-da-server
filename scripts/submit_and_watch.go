@@ -47,7 +47,7 @@ func SubmitDataAndWatch(specs *types.AvailDASpecs, ctx context.Context, data []b
 		return types.AvailBlockRef{}, fmt.Errorf("data was not found in the block")
 	}
 
-	println(fmt.Sprintf(`Block Hash: %v, Block Index: %v, Tx Hash: %v, Tx Index: %v`, res.BlockHash.ToHexWith0x(), res.BlockNumber, res.TxHash.ToHexWith0x(), res.TxIndex))
+	log.Info("Block Hash: %v, Block Index: %v, Tx Hash: %v, Tx Index: %v", res.BlockHash.ToHexWith0x(), res.BlockNumber, res.TxHash.ToHexWith0x(), res.TxIndex)
 	events := res.Events.Unwrap()
 	event := SDK.EventFindFirst(events, daPallet.EventDataSubmitted{}).Unwrap()
 

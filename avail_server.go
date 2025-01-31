@@ -119,7 +119,7 @@ func (d *AvailDAServer) HandleGet(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	fmt.Println(hex.EncodeToString(commExtracted))
+	d.log.Debug(hex.EncodeToString(commExtracted))
 	input, err := d.store.Get(r.Context(), commExtracted)
 	if err != nil && errors.Is(err, ErrNotFound) {
 		d.log.Error("Commitment not found", "key", key, "error", err)

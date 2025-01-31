@@ -41,7 +41,6 @@ func GetMetadataLatest(api *gsrpc.SubstrateAPI) (*gsrpc_types.Metadata, error) {
 	meta, err := api.RPC.State.GetMetadataLatest()
 
 	if err != nil {
-		fmt.Printf("cannot get metadata: error:%v", err)
 		return &gsrpc_types.Metadata{}, err
 	}
 

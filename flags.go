@@ -90,7 +90,6 @@ type CLIConfig struct {
 }
 
 func ReadCLIConfig(ctx *cli.Context) CLIConfig {
-	fmt.Println(ctx.String(AvailRPCUrl), ctx.String(Seed), ctx.Int(AppID), ctx.Duration(Timeout))
 	return CLIConfig{
 		RPC:     ctx.String(AvailRPCUrl),
 		Seed:    ctx.String(Seed),
