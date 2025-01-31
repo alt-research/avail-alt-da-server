@@ -2,6 +2,7 @@ package scripts
 
 import (
 	"context"
+
 	"fmt"
 
 	types "avail-alt-da-server/types"
@@ -9,9 +10,10 @@ import (
 	"github.com/availproject/avail-go-sdk/metadata"
 	daPallet "github.com/availproject/avail-go-sdk/metadata/pallets/data_availability"
 	SDK "github.com/availproject/avail-go-sdk/sdk"
+	"github.com/ethereum/go-ethereum/log"
 )
 
-func SubmitDataAndWatch(specs *types.AvailDASpecs, ctx context.Context, data []byte) (types.AvailBlockRef, error) {
+func SubmitDataAndWatch(specs *types.AvailDASpecs, ctx context.Context, data []byte, log log.Logger) (types.AvailBlockRef, error) {
 	sdk, err := SDK.NewSDK(specs.ApiURL)
 	if err != nil {
 		panic(err)
@@ -20,23 +22,28 @@ func SubmitDataAndWatch(specs *types.AvailDASpecs, ctx context.Context, data []b
 	accountId, err := metadata.NewAccountIdFromAddress(specs.KeyringPair.SS58Address(42))
 
 	if err != nil {
+		log.Error("unable to create account id from address", "error", err)
 		return types.AvailBlockRef{}, fmt.Errorf("unable to create account id from address: %v, error: %w", specs.KeyringPair.SS58Address(42), err)
 	}
 
 	nonce, err := SDK.Account.Nonce(sdk.Client, accountId)
 	if err != nil {
+		log.Error("unable to get nonce for account id", "error", err)
 		return types.AvailBlockRef{}, fmt.Errorf("unable to get nonce for account id: %v, error: %w", accountId, err)
 	}
 
 	tx := sdk.Tx.DataAvailability.SubmitData(data)
 	res, err := tx.ExecuteAndWatchInclusion(specs.KeyringPair, SDK.NewTransactionOptions().WithAppId(uint32(specs.AppID)))
 	if err != nil {
-		return types.AvailBlockRef{}, err
+		log.Error("unable to execute and watch inclusion", "error", err)
+		return types.AvailBlockRef{}, fmt.Errorf("unable to execute and watch inclusion: %w", err)
 	}
 
 	if isSuc, err := res.IsSuccessful(); err != nil {
+		log.Error("cannot check if data was submitted", "error", err)
 		return types.AvailBlockRef{}, fmt.Errorf("cannot check if data was submitted: %w", err)
 	} else if !isSuc {
+		log.Error("data was not found in the block")
 		return types.AvailBlockRef{}, fmt.Errorf("data was not found in the block")
 	}
 

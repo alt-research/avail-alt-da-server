@@ -29,7 +29,7 @@ func StartDAServer(cliCtx *cli.Context) error {
 
 	l.Info("Initializing Alt DA DA server...")
 
-	availService := availService.NewAvailService(cfg.RPC, cfg.Seed, cfg.AppId, cfg.Timeout)
+	availService := availService.NewAvailService(cfg.RPC, cfg.Seed, cfg.AppId, cfg.Timeout, l)
 
 	server := NewAvailDAServer(cliCtx.String(ListenAddrFlagName), cliCtx.Int(PortFlagName), availService, l, true)
 
