@@ -1,31 +1,22 @@
 FROM golang:1.23.4
-
 WORKDIR /app
-
 COPY go.mod go.sum ./
-
 RUN go mod download
-
 COPY . .
-
 RUN make da-server
-
 ARG ADDR=0.0.0.0
 ARG PORT=8080
 ARG AVAIL_RPC=http://localhost:9933
 ARG AVAIL_SEED=""
 ARG AVAIL_APPID=0
-
 ENV ADDR=${ADDR} \
     PORT=${PORT} \
     AVAIL_RPC=${AVAIL_RPC} \
     AVAIL_SEED=${AVAIL_SEED} \
     AVAIL_APPID=${AVAIL_APPID}
-
 EXPOSE ${PORT}
 EXPOSE 8080
 EXPOSE 433
-
 CMD echo "ADDR: ${ADDR}" && \
     echo "PORT: ${PORT}" && \
     echo "AVAIL_RPC: ${AVAIL_RPC}" && \
