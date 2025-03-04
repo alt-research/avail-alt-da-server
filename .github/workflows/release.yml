@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 env:
-  DOCKER_IMAGE: "availj/avail-da-server"
+  DOCKER_IMAGE: "availj/avail-alt-da-server"
   ADDR: "0.0.0.0"
   PORT: "8080"
   AVAIL_RPC: "http://localhost:9933"
