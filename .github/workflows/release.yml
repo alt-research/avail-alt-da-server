@@ -11,7 +11,6 @@ env:
   PORT: "8080"
   AVAIL_RPC: "http://localhost:9933"
   AVAIL_APPID: "0"
-  AVAIL_TIMEOUT: "100"
 
 jobs:
   release:
@@ -49,7 +48,6 @@ jobs:
             PORT=${{ env.PORT }}
             AVAIL_RPC=${{ env.AVAIL_RPC }}
             AVAIL_APPID=${{ env.AVAIL_APPID }}
-            AVAIL_TIMEOUT=${{ env.AVAIL_TIMEOUT }}
           tags: |
             ${{ env.DOCKER_IMAGE }}:latest
             ${{ env.DOCKER_IMAGE }}:${{ steps.get_version.outputs.VERSION }}
@@ -80,6 +78,5 @@ jobs:
               -e AVAIL_RPC=http://your-rpc-endpoint:9933 \
               -e AVAIL_SEED=your-seed \
               -e AVAIL_APPID=0 \
-              -e AVAIL_TIMEOUT=100 \
               ${{ env.DOCKER_IMAGE }}:latest
             ```
