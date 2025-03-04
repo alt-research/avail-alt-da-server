@@ -1,7 +1,7 @@
 version: "3.8"
 services:
   avail-da-server:
-    build: .
+    image: availj/avail-da-server:latest
     env_file:
       - .env
     environment:
