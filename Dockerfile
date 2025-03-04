@@ -1,4 +1,4 @@
-FROM golang:1.23.4 as builder
+FROM golang:1.23.4
 
 WORKDIR /app
 
@@ -9,8 +9,6 @@ RUN go mod download
 COPY . .
 
 RUN make da-server
-
-FROM debian:bullseye-slim
 
 ARG ADDR=0.0.0.0
 ARG PORT=8080
@@ -26,10 +24,6 @@ ENV ADDR=${ADDR} \
     AVAIL_APPID=${AVAIL_APPID} \
     AVAIL_TIMEOUT=${AVAIL_TIMEOUT}
 
-WORKDIR /app
-
-COPY --from=builder /app/bin/avail-da-server /app/bin/avail-da-server
-
 EXPOSE ${PORT}
 EXPOSE 8080
 EXPOSE 433
@@ -40,4 +34,4 @@ CMD echo "ADDR: ${ADDR}" && \
     echo "AVAIL_SEED: ${AVAIL_SEED}" && \
     echo "AVAIL_APPID: ${AVAIL_APPID}" && \
     echo "AVAIL_TIMEOUT: ${AVAIL_TIMEOUT}" && \
-    /app/bin/avail-da-server --addr=${ADDR} --port=${PORT} --avail.rpc="${AVAIL_RPC}" --avail.seed="${AVAIL_SEED}" --avail.appid=${AVAIL_APPID} --avail.timeout=${AVAIL_TIMEOUT}
+    ./bin/avail-da-server --addr=${ADDR} --port=${PORT} --avail.rpc="${AVAIL_RPC}" --avail.seed="${AVAIL_SEED}" --avail.appid=${AVAIL_APPID} --avail.timeout=${AVAIL_TIMEOUT}
