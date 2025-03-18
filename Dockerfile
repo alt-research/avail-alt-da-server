@@ -1,21 +1,20 @@
-# Use an official Go image to build the Go binary
-FROM golang:1.23.4 as builder
-
-# Set the current working directory inside the container
+FROM golang:1.23.4
 WORKDIR /app
-
-# Copy the Go module files
-COPY go.mod go.sum .env ./
-
-# Download all the dependencies
+COPY go.mod go.sum ./
 RUN go mod download
-
-# Copy the rest of the application code
 COPY . .
-
-# Build the Go binary with the Makefile
 RUN make da-server
-
+ARG ADDR=0.0.0.0
+ARG PORT=8080
+ARG AVAIL_RPC=http://localhost:9933
+ARG AVAIL_SEED=""
+ARG AVAIL_APPID=0
+ENV ADDR=${ADDR} \
+    PORT=${PORT} \
+    AVAIL_RPC=${AVAIL_RPC} \
+    AVAIL_SEED=${AVAIL_SEED} \
+    AVAIL_APPID=${AVAIL_APPID}
+EXPOSE ${PORT}
 EXPOSE 8080
 EXPOSE 433
 

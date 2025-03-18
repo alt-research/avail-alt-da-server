@@ -1,17 +1,14 @@
 version: "3.8"
 services:
   avail-da-server:
-    build: .
-    env_file:
-      - .env
+    image: availj/avail-alt-da-server:latest
     environment:
-      - ADDR
-      - PORT
-      - AVAIL_RPC
+      - ADDR=0.0.0.0
+      - PORT=8080
+      - AVAIL_RPC=http://localhost:9933
       - AVAIL_SEED
-      - AVAIL_APPID
-      - AVAIL_TIMEOUT
+      - AVAIL_APPID=0
     ports:
-      - "${PORT}:${PORT}"
+      - "${PORT:-8080}:${PORT:-8080}"
       - "8080:8080"
       - "433:433"
